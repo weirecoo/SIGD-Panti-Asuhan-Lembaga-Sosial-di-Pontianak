@@ -11,7 +11,7 @@ dan zona sosial, dengan data yang dipersiapkan di QGIS dan dilayani lewat Node.j
 | SK-1 | Akuisisi data 4 format (CSV, SHP, GeoJSON, GPKG) | Selesai |
 | SK-2 | Manajemen vektor di QGIS | Selesai |
 | SK-3 | Backend API + peta Leaflet dasar + digitasi web | Selesai |
-| SK-4 | Frontend: filter kategori, state terpusat, MarkerCluster | Belum |
+| SK-4 | Frontend: filter kategori, state terpusat, MarkerCluster | Selesai |
 | SK-5 | Laporan perbandingan QGIS vs Leaflet | Belum |
 
 ## Struktur repo
