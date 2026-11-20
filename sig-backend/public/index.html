@@ -2,19 +2,654 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Peta Lembaga Sosial - Pontianak Barat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Integrasi Backend+Frontend - Lembaga Sosial Pontianak Barat</title>
   <link rel="icon" href="data:,">
+
+  <!-- CSS Leaflet (lokal backend) -->
   <link rel="stylesheet" href="lib/leaflet/leaflet.css">
+  <!-- CSS Leaflet.draw (lokal backend) -->
   <link rel="stylesheet" href="lib/draw/leaflet.draw.css">
-  <link rel="stylesheet" href="style.css">
+  <!-- CSS MarkerCluster (CDN untuk test) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
+  <style>
+    /* Tata letak dasar halaman */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Wadah peta memenuhi layar */
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+
+    /* Panel kontrol di atas peta */
+    #panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: #fff;
+      padding: 12px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      min-width: 240px;
+      max-width: 320px;
+      line-height: 1.5;
+      max-height: 95vh;
+      overflow-y: auto;
+    }
+
+    #panel h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .filter-item {
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    /* Penanda warna pada label/legenda */
+    .warna {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid #333;
+    }
+
+    .merah { background: #c62828; }
+    .biru { background: #1565c0; }
+    .oranye { background: #ef6c00; }
+
+    #info {
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    #error {
+      margin-top: 8px;
+      color: #b00020;
+      font-size: 13px;
+      display: none;
+    }
+
+    /* Status layer tambahan */
+    #layer-status {
+      margin-top: 8px;
+      color: #b00020;
+      font-size: 13px;
+      display: none;
+    }
+
+    /* Pesan status zona */
+    #zona-status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #333;
+      display: none;
+      overflow-wrap: anywhere;
+    }
+
+    hr {
+      margin: 8px 0;
+      border: none;
+      border-top: 1px solid #ddd;
+    }
+
+    /* Ikon marker lembaga (L.marker + L.divIcon) */
+    .marker-lembaga {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+      box-sizing: border-box;
+    }
+
+    /* Gaya ikon cluster kustom */
+    .cluster-icon {
+      background: #2c7fb8;
+      color: #fff;
+      border-radius: 50%;
+      text-align: center;
+      font-weight: bold;
+      line-height: 40px;
+      border: 2px solid #fff;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+      width: 40px;
+      height: 40px;
+    }
+
+    /* Legenda peta */
+    .legend-item {
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .legend-line-batas {
+      display: inline-block;
+      width: 18px;
+      border-top: 2px dashed #444;
+    }
+
+    .legend-line-jalan {
+      display: inline-block;
+      width: 18px;
+      border-top: 3px solid #6d4c41;
+    }
+
+    .legend-box {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      background: rgba(123, 44, 191, 0.2);
+      border: 2px solid #7b2cbf;
+      box-sizing: border-box;
+    }
+  </style>
 </head>
 <body>
-  <header>Peta Panti Asuhan &amp; Lembaga Sosial — Pontianak Barat</header>
+  <!-- Panel kontrol filter dan status -->
+  <div id="panel">
+    <h3>Filter Lembaga Sosial</h3>
+
+    <label class="filter-item">
+      <input type="checkbox" id="filter-panti_asuhan" checked>
+      <span class="warna merah"></span> Panti Asuhan
+    </label>
+    <label class="filter-item">
+      <input type="checkbox" id="filter-panti_jompo" checked>
+      <span class="warna biru"></span> Panti Jompo
+    </label>
+    <label class="filter-item">
+      <input type="checkbox" id="filter-rumah_singgah" checked>
+      <span class="warna oranye"></span> Rumah Singgah
+    </label>
+
+    <hr>
+
+    <label class="filter-item">
+      <input type="checkbox" id="toggle-cluster">
+      Aktifkan cluster
+    </label>
+
+    <hr>
+
+    <!-- Checkbox visibilitas layer tambahan -->
+    <label class="filter-item">
+      <input type="checkbox" id="toggle-batas" checked>
+      Batas kecamatan
+    </label>
+    <label class="filter-item">
+      <input type="checkbox" id="toggle-jalan" checked>
+      Jalan utama
+    </label>
+    <label class="filter-item">
+      <input type="checkbox" id="toggle-zona" checked>
+      Zona sosial
+    </label>
+
+    <div id="info">Menampilkan 0 dari 0 lokasi</div>
+    <div id="error"></div>
+    <div id="layer-status"></div>
+    <div id="zona-status"></div>
+
+    <hr>
+
+    <!-- Legenda peta -->
+    <div><strong>Legenda</strong></div>
+    <div class="legend-item"><span class="warna merah"></span> Panti Asuhan</div>
+    <div class="legend-item"><span class="warna biru"></span> Panti Jompo</div>
+    <div class="legend-item"><span class="warna oranye"></span> Rumah Singgah</div>
+    <div class="legend-item"><span class="legend-line-batas"></span> Batas kecamatan</div>
+    <div class="legend-item"><span class="legend-line-jalan"></span> Jalan utama</div>
+    <div class="legend-item"><span class="legend-box"></span> Zona sosial</div>
+  </div>
+
+  <!-- Wadah peta -->
   <div id="map"></div>
-  <div id="pesan" hidden></div>
+
+  <!-- JS Leaflet & Leaflet.draw (lokal backend) -->
   <script src="lib/leaflet/leaflet.js"></script>
   <script src="lib/draw/leaflet.draw.js"></script>
-  <script src="app.js"></script>
+  <!-- JS MarkerCluster (CDN untuk test) -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <script>
+    const DATA_URL = '/api/data/sosial';
+    const JALAN_URL = '/api/data/jalan';
+    const ZONA_URL = '/api/data/zona';
+    const BATAS_URL = 'batas_kec_west.geojson';
+    const API_ZONA = '/api/feature/zona';
+
+    const state = { filters: { panti_asuhan: true, panti_jompo: true, rumah_singgah: true }, cluster: false };
+    state.layers = { batas: true, jalan: true, zona: true };
+
+    let allData = null;
+    let currentLayer = null;
+
+    let batasLayer = null;
+    let jalanLayer = null;
+    let zonaLayer = null;
+    let batasBounds = null;
+    let titikBounds = null;
+
+    const map = L.map('map').setView([-0.0263, 109.3115], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.createPane('paneBatas');
+    map.getPane('paneBatas').style.zIndex = 390;
+    map.createPane('paneJalan');
+    map.getPane('paneJalan').style.zIndex = 392;
+    map.createPane('paneZona');
+    map.getPane('paneZona').style.zIndex = 395;
+
+    const warnaJenis = {
+      panti_asuhan: '#c62828',
+      panti_jompo: '#1565c0',
+      rumah_singgah: '#ef6c00'
+    };
+
+    function tampilkanStatusLayer(pesan) {
+      const el = document.getElementById('layer-status');
+      if (!el) return;
+      const p = document.createElement('div');
+      p.textContent = pesan;
+      el.appendChild(p);
+      el.style.display = 'block';
+    }
+
+    function applyPreferredFitBounds() {
+      if (batasBounds && batasBounds.isValid()) {
+        map.fitBounds(batasBounds);
+      } else if (titikBounds && titikBounds.isValid()) {
+        map.fitBounds(titikBounds);
+      }
+    }
+
+    function buatIconLembaga(jenis) {
+      const warna = warnaJenis[jenis] || '#616161';
+      return L.divIcon({
+        className: '',
+        html: '<div class="marker-lembaga" style="background:' + warna + '"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+        popupAnchor: [0, -8]
+      });
+    }
+
+    fetch(DATA_URL)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Gagal memuat data (status ' + response.status + ').');
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        allData = data;
+        renderSosial();
+        const bounds = L.geoJSON(allData).getBounds();
+        if (bounds.isValid()) {
+          titikBounds = bounds;
+        }
+        applyPreferredFitBounds();
+      })
+      .catch(function (err) {
+        const errorEl = document.getElementById('error');
+        errorEl.textContent = 'Error: data lembaga tidak dapat dimuat dari API. (' + err.message + ')';
+        errorEl.style.display = 'block';
+        console.error(err);
+      });
+
+    function renderSosial() {
+      if (!allData) return;
+
+      if (currentLayer) {
+        map.removeLayer(currentLayer);
+      }
+
+      const features = allData.features || [];
+      const total = features.length;
+      let tampil = 0;
+
+      let layerGroup;
+      if (state.cluster) {
+        layerGroup = L.markerClusterGroup({
+          iconCreateFunction: function (cluster) {
+            const count = cluster.getChildCount();
+            return L.divIcon({
+              html: '<div class="cluster-icon">' + count + '</div>',
+              className: '',
+              iconSize: [40, 40]
+            });
+          }
+        });
+      } else {
+        layerGroup = L.layerGroup();
+      }
+
+      features.forEach(function (feature) {
+        const props = feature.properties || {};
+        const jenis = props.jenis_lembaga;
+
+        if (!state.filters[jenis]) return;
+
+        tampil++;
+
+        const coords = feature.geometry.coordinates;
+        const lng = coords[0];
+        const lat = coords[1];
+
+        const marker = L.marker([lat, lng], { icon: buatIconLembaga(jenis) });
+
+        const popupHtml =
+          '<strong>' + (props.nama ?? '-') + '</strong><br>' +
+          'Jenis: ' + (props.jenis_lembaga ?? '-') + '<br>' +
+          'Jumlah anak: ' + (props.jumlah_anak ?? '-') + '<br>' +
+          'Izin: ' + (props.izin ?? '-') + '<br>' +
+          'Kontak: ' + (props.kontak ?? '-');
+
+        marker.bindPopup(popupHtml);
+        layerGroup.addLayer(marker);
+      });
+
+      currentLayer = layerGroup;
+      map.addLayer(currentLayer);
+
+      document.getElementById('info').textContent = 'Menampilkan ' + tampil + ' dari ' + total + ' lokasi';
+    }
+
+    document.getElementById('filter-panti_asuhan').addEventListener('change', function (e) {
+      state.filters.panti_asuhan = e.target.checked;
+      renderSosial();
+    });
+
+    document.getElementById('filter-panti_jompo').addEventListener('change', function (e) {
+      state.filters.panti_jompo = e.target.checked;
+      renderSosial();
+    });
+
+    document.getElementById('filter-rumah_singgah').addEventListener('change', function (e) {
+      state.filters.rumah_singgah = e.target.checked;
+      renderSosial();
+    });
+
+    document.getElementById('toggle-cluster').addEventListener('change', function (e) {
+      state.cluster = e.target.checked;
+      renderSosial();
+    });
+
+    fetch(BATAS_URL)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Gagal memuat batas kecamatan');
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        batasLayer = L.geoJSON(data, {
+          pane: 'paneBatas',
+          interactive: false,
+          style: function () {
+            return {
+              color: '#444444',
+              dashArray: '6 6',
+              weight: 2,
+              fill: false
+            };
+          },
+          onEachFeature: function (feature, layer) {
+            const props = feature.properties || {};
+            const nama = props.name || props.nama || props.NAMOBJ || '';
+            if (nama) {
+              layer.bindTooltip(String(nama), { sticky: true });
+            }
+          }
+        });
+
+        const bounds = batasLayer.getBounds();
+        if (bounds.isValid()) {
+          batasBounds = bounds;
+        }
+
+        if (state.layers.batas) {
+          batasLayer.addTo(map);
+        }
+        applyPreferredFitBounds();
+      })
+      .catch(function () {
+        tampilkanStatusLayer('Gagal memuat batas kecamatan (' + BATAS_URL + ').');
+        applyPreferredFitBounds();
+      });
+
+    fetch(JALAN_URL)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Gagal memuat jalan utama');
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        jalanLayer = L.geoJSON(data, {
+          pane: 'paneJalan',
+          style: function () {
+            return { color: '#6d4c41', weight: 3 };
+          },
+          onEachFeature: function (feature, layer) {
+            const props = feature.properties || {};
+            if (props.name) {
+              layer.bindTooltip(String(props.name), { sticky: true });
+            }
+          }
+        });
+
+        if (state.layers.jalan) {
+          jalanLayer.addTo(map);
+        }
+      })
+      .catch(function () {
+        tampilkanStatusLayer('Gagal memuat jalan utama dari API.');
+      });
+
+    zonaLayer = L.featureGroup();
+
+    let zonaStatusTimer = null;
+
+    function tampilkanStatusZona(pesan, sukses) {
+      const el = document.getElementById('zona-status');
+      el.textContent = pesan;
+      el.style.display = 'block';
+      el.style.color = sukses ? '#1b5e20' : '#b00020';
+
+      if (zonaStatusTimer) {
+        clearTimeout(zonaStatusTimer);
+      }
+      zonaStatusTimer = setTimeout(function () {
+        el.textContent = '';
+        el.style.display = 'none';
+        zonaStatusTimer = null;
+      }, 4000);
+    }
+
+    function buatPopupZona(properties) {
+      const props = properties || {};
+      let html = '';
+      const keys = Object.keys(props);
+      if (keys.length === 0) {
+        return 'Zona: -';
+      }
+      keys.forEach(function (key) {
+        const nilai = props[key];
+        html += '<strong>' + key + ':</strong> ' + (nilai == null || nilai === '' ? '-' : nilai) + '<br>';
+      });
+      return html;
+    }
+
+    const warnaZona = ['#7b2cbf', '#9d4edd', '#5a189a'];
+    fetch(ZONA_URL)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Gagal memuat zona sosial');
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        const features = data.features || [];
+        features.forEach(function (feature, index) {
+          const warna = warnaZona[index % warnaZona.length];
+          const layer = L.geoJSON(feature, {
+            pane: 'paneZona',
+            style: function () {
+              return {
+                color: warna,
+                fillColor: warna,
+                fillOpacity: 0.2,
+                weight: 2
+              };
+            }
+          });
+
+          layer.eachLayer(function (lyr) {
+            lyr.bindPopup(buatPopupZona(feature.properties));
+            zonaLayer.addLayer(lyr);
+          });
+        });
+
+        if (state.layers.zona) {
+          zonaLayer.addTo(map);
+        }
+      })
+      .catch(function () {
+        tampilkanStatusLayer('Gagal memuat zona sosial dari API.');
+        if (state.layers.zona) {
+          zonaLayer.addTo(map);
+        }
+      });
+
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polygon: {
+          shapeOptions: {
+            color: '#7b2cbf',
+            fillOpacity: 0.2
+          }
+        },
+        marker: false,
+        polyline: false,
+        circle: false,
+        rectangle: false,
+        circlemarker: false
+      },
+      edit: {
+        featureGroup: zonaLayer,
+        edit: false,
+        remove: true
+      }
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+      const layer = e.layer;
+
+      layer.setStyle({ color: '#7b2cbf', fillColor: '#7b2cbf', fillOpacity: 0.2, weight: 2 });
+      layer.options.pane = 'paneZona';
+      zonaLayer.addLayer(layer);
+      if (state.layers.zona && !map.hasLayer(zonaLayer)) {
+        zonaLayer.addTo(map);
+      }
+
+      const fitur = layer.toGeoJSON();
+      fitur.properties = fitur.properties || {};
+
+      const namaZona = prompt('Masukkan nama zona:');
+      if (namaZona) {
+        fitur.properties.nama_zona = namaZona.trim();
+      }
+      layer.feature = fitur;
+      layer.bindPopup(buatPopupZona(fitur.properties));
+
+      fetch(API_ZONA, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature: fitur })
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error('Respons server tidak berhasil');
+          }
+          tampilkanStatusZona('Zona berhasil disimpan ke backend.', true);
+        })
+        .catch(function () {
+          tampilkanStatusZona('Gagal menyimpan, backend belum aktif', false);
+        });
+    });
+
+    map.on(L.Draw.Event.DELETED, function () {
+      const geojson = zonaLayer.toGeoJSON();
+      const features = Array.isArray(geojson.features) ? geojson.features : [];
+
+      fetch(API_ZONA, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features: features })
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error('Respons server tidak berhasil');
+          }
+          tampilkanStatusZona('Poligon dihapus dari peta dan data/zona_sosial.geojson diperbarui.', true);
+        })
+        .catch(function () {
+          tampilkanStatusZona('Poligon dihapus dari peta, tetapi gagal memperbarui data/zona_sosial.geojson di backend.', false);
+        });
+    });
+
+    document.getElementById('toggle-batas').addEventListener('change', function (e) {
+      state.layers.batas = e.target.checked;
+      if (!batasLayer) return;
+      if (state.layers.batas) {
+        batasLayer.addTo(map);
+      } else {
+        map.removeLayer(batasLayer);
+      }
+    });
+
+    document.getElementById('toggle-jalan').addEventListener('change', function (e) {
+      state.layers.jalan = e.target.checked;
+      if (!jalanLayer) return;
+      if (state.layers.jalan) {
+        jalanLayer.addTo(map);
+      } else {
+        map.removeLayer(jalanLayer);
+      }
+    });
+
+    document.getElementById('toggle-zona').addEventListener('change', function (e) {
+      state.layers.zona = e.target.checked;
+      if (state.layers.zona) {
+        zonaLayer.addTo(map);
+      } else {
+        map.removeLayer(zonaLayer);
+      }
+    });
+  </script>
 </body>
 </html>
