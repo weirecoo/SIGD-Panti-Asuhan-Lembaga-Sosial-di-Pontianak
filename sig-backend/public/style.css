@@ -1,0 +1,7 @@
+html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+body { display: flex; flex-direction: column; }
+header { background: #1b5e20; color: #fff; padding: 10px 16px; font-weight: 600; }
+#map { flex: 1; }
+#pesan { position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: #c62828; color: #fff; padding: 8px 14px; border-radius: 6px; }
+.popup b { display: block; margin-bottom: 4px; }
